@@ -1,0 +1,110 @@
+name: Build Nokia 5G21 Super-High-Total
+
+on:
+  workflow_dispatch:      
+  schedule:
+    - cron: '0 20 * * *'  
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cleanup Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost
+          sudo apt clean
+
+      - name: Initialization Environment
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev python3-setuptools swig zlib1g-dev apktool
+
+      - name: Clone Source Code
+        run: |
+          git clone --depth 1 https://github.com/coolsnowwolf/lede
+          cp -r lede/* .
+
+      - name: Update & Install Feeds
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Load Super Configuration
+        run: |
+          cat <<EOF > .config
+          CONFIG_TARGET_ipq807x=y
+          CONFIG_TARGET_ipq807x_generic_DEVICE_nokia_5g21=y
+
+          # --- 基础 5G & 网络环境 ---
+          CONFIG_PACKAGE_kmod-usb-net-cdc-mbim=y
+          CONFIG_PACKAGE_kmod-usb-net-qmi-wwan=y
+          CONFIG_PACKAGE_kmod-usb-serial-option=y
+          CONFIG_PACKAGE_luci-app-modemmanager=y
+
+          # --- 内网穿透与组网 (你要求的列表) ---
+          CONFIG_PACKAGE_luci-app-daed=y
+          CONFIG_PACKAGE_luci-app-frpc=y
+          CONFIG_PACKAGE_luci-app-frps=y
+          CONFIG_PACKAGE_luci-app-npc=y
+          CONFIG_PACKAGE_luci-app-natmap=y
+          CONFIG_PACKAGE_luci-app-ddnsto=y
+          CONFIG_PACKAGE_luci-app-zerotier=y
+          CONFIG_PACKAGE_luci-app-wireguard=y
+          CONFIG_PACKAGE_luci-app-easytier=y
+
+          # --- DNS 与去广告 ---
+          CONFIG_PACKAGE_luci-app-adbyby-plus=y
+          CONFIG_PACKAGE_luci-app-adguardhome=y
+          CONFIG_PACKAGE_luci-app-mosdns=y
+          CONFIG_PACKAGE_luci-app-smartdns=y
+
+          # --- 下载与云盘 ---
+          CONFIG_PACKAGE_luci-app-aria2=y
+          CONFIG_PACKAGE_luci-app-qbittorrent=y
+          CONFIG_PACKAGE_luci-app-transmission=y
+          CONFIG_PACKAGE_luci-app-rclone=y
+          CONFIG_PACKAGE_luci-app-alist=y
+
+          # --- 文件共享与磁盘管理 (实现 2G 空间) ---
+          CONFIG_PACKAGE_luci-app-filebrowser=y
+          CONFIG_PACKAGE_luci-app-ksmbd=y
+          CONFIG_PACKAGE_luci-app-samba4=y
+          CONFIG_PACKAGE_luci-app-diskman=y
+          CONFIG_PACKAGE_luci-app-partexp=y
+          CONFIG_PACKAGE_automount=y
+
+          # --- 监控与工具 ---
+          CONFIG_PACKAGE_luci-app-mwan3=y
+          CONFIG_PACKAGE_luci-app-syncdial=y
+          CONFIG_PACKAGE_luci-app-nlbwmon=y
+          CONFIG_PACKAGE_luci-app-netdata=y
+          CONFIG_PACKAGE_btop=y
+          CONFIG_PACKAGE_luci-app-ttyd=y
+          CONFIG_PACKAGE_luci-app-wechatpush=y
+          CONFIG_PACKAGE_luci-app-store=y
+
+          # --- 系统加速与主题 ---
+          CONFIG_PACKAGE_luci-app-turboacc=y
+          CONFIG_PACKAGE_luci-theme-argon=y
+          CONFIG_PACKAGE_luci-app-dockerman=y
+          CONFIG_PACKAGE_docker-ce=y
+          EOF
+          
+          # 自动补全所有依赖项
+          make defconfig
+
+      - name: Download & Compile
+        run: |
+          make download -j8
+          make -j$(nproc) || make -j1 V=s
+
+      - name: Upload Firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nokia-5G21-Super-High-Total
+          path: bin/targets/ipq807x/generic/*.bin
