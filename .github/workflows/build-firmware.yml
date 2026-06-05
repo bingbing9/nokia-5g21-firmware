@@ -3,7 +3,7 @@ name: Build Nokia 5G21 Super-High-Total
 on:
   workflow_dispatch:      
   schedule:
-    - cron: '0 20 * * *'  
+    - cron: '0 20 1 * *'  
 
 jobs:
   build:
@@ -101,7 +101,7 @@ jobs:
       - name: Download & Compile
         run: |
           make download -j8
-          make -j$(nproc) || make -j1 V=s
+          make -j1 V=s
 
       - name: Upload Firmware
         uses: actions/upload-artifact@v4
